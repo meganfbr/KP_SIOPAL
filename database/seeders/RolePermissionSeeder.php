@@ -89,18 +89,17 @@ class RolePermissionSeeder extends Seeder
             'd3n' => 'Laboran_D3N',
         ];
 
-        foreach ($labs as $slug => $roleName) {
-            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
-            $role->givePermissionTo($allLaboranPermissions);
-            $role->givePermissionTo("lab_{$slug}_view");
-        }
-
         // Create lab permissions (view, manage, edit, delete) if labs exist
         if (Schema::hasTable('laboratoria') && Laboratorium::count() > 0) {
             $this->createLabPermissions();
         }
 
-        $this->command->info('✅ Roles and permissions created successfully!');
+        foreach ($labs as $slug => $roleName) {
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
+            $role->givePermissionTo($allLaboranPermissions);
+            $role->givePermissionTo("lab_{$slug}_view");
+        }
+                $this->command->info('✅ Roles and permissions created successfully!');
         $this->command->newLine();
         $this->command->info('📌 Next steps:');
         $this->command->info('   1. Run: php artisan db:seed --class=UserSeeder');
@@ -121,7 +120,7 @@ class RolePermissionSeeder extends Seeder
         $labActions = ['view', 'manage', 'edit', 'delete'];
 
         Laboratorium::orderBy('ruang')->get()->each(function (Laboratorium $lab) use ($labActions) {
-            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], $lab->ruang));
+            $labSlug = strtolower(str_replace(['LAB ', ' ', '.'], ['', '_', '_'], $lab->ruang));
 
             foreach ($labActions as $action) {
                 Permission::firstOrCreate([

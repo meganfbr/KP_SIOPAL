@@ -294,17 +294,53 @@ class PCInventoryResource extends Resource
     {
         return $table
             ->columns([
+                TextColumn::make('kode_pc')
+                    ->label('Kode PC')
+                    ->searchable()
+                    ->sortable(),
+                TextColumn::make('no_pc')
+                    ->label('NoPC')
+                    ->searchable()
+                    ->sortable()
+                    ->color('primary')
+                    ->weight('bold')
+                    ->action(
+                        Tables\Actions\Action::make('viewComponents')
+                            ->modalHeading(fn($record) => "Detail Komponen PC - {$record->no_pc} ({$record->kode_pc})")
+                            ->modalContent(fn($record) => view('filament.components.pc-detail-modal', ['record' => $record]))
+                            ->modalSubmitAction(false)
+                            ->modalCancelActionLabel('Tutup')
+                    ),
+                TextColumn::make('lokasi.ruang')
+                    ->label('Lokasi')
+                    ->sortable()
+                    ->badge(),
+                TextColumn::make('kondisi')
+                    ->label('Kondisi')
+                    ->sortable()
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'Baik' => 'success',
+                        'Rusak Ringan' => 'warning',
+                        'Rusak Berat' => 'danger',
+                        'Dalam Perbaikan' => 'info',
+                        default => 'gray',
+                    }),
+                TextColumn::make('asal.ruang')
+                    ->label('Asal PC')
+                    ->sortable()
+                    ->placeholder('Pengadaan Baru'),
+                TextColumn::make('petugas.name')
+                    ->label('Petugas')
+                    ->sortable()
+                    ->placeholder('-'),
+                
+                // Existing columns as hidden by default
                 TextColumn::make('kode_inventaris')
                     ->label('No Inventaris')
                     ->searchable()
-                    ->sortable(),
-                TextColumn::make('laboratorium.ruang')->sortable()->badge(),
-                TextColumn::make('kondisi')->sortable()->badge()->color(fn(string $state): string => match ($state) {
-                    'Baik' => 'success',
-                    'Rusak Ringan' => 'warning',
-                    'Rusak Berat' => 'danger',
-                    'Dalam Perbaikan' => 'info',
-                }),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('inventoriable.processor.tipe')->label('CPU')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('inventoriable.ram.tipe')->label('RAM')->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('inventoriable.motherboard.tipe')->label('Motherboard')->toggleable(isToggledHiddenByDefault: true),
@@ -366,9 +402,19 @@ class PCInventoryResource extends Resource
             ->schema([
                 InfoSection::make('Informasi Umum PC')
                     ->schema([
-                        TextEntry::make('laboratorium.ruang')
-                            ->label('Laboratorium')
+                        TextEntry::make('kode_pc')
+                            ->label('Kode PC'),
+                        TextEntry::make('no_pc')
+                            ->label('No PC'),
+                        TextEntry::make('lokasi.ruang')
+                            ->label('Lokasi')
                             ->badge(),
+                        TextEntry::make('asal.ruang')
+                            ->label('Asal PC')
+                            ->placeholder('Pengadaan Baru'),
+                        TextEntry::make('petugas.name')
+                            ->label('Petugas')
+                            ->placeholder('-'),
                         TextEntry::make('kode_inventaris')
                             ->label('No Inventaris'),
                         TextEntry::make('tanggal_pengadaan')
@@ -384,7 +430,7 @@ class PCInventoryResource extends Resource
                                 'Dalam Perbaikan' => 'info',
                                 default => 'gray',
                             }),
-                    ])->columns(2),
+                    ])->columns(3),
 
                 InfoSection::make('Spesifikasi Komponen PC')
                     ->description('Detail komponen hardware yang terpasang.')

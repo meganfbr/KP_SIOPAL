@@ -56,6 +56,12 @@ class MouseResource extends Resource
 
     protected static ?int $navigationSort = 9;
 
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->hasRole('super_admin') ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

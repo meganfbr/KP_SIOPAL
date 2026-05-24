@@ -26,8 +26,17 @@ class EditPCInventory extends EditRecord
         // 2. Update record inventoriable (pc_details)
         $record->inventoriable->update($detailsData);
 
+        // Sync lokasi_id and petugas_id
+        $data['lokasi_id'] = $data['laboratorium_id'];
+        if (auth()->check()) {
+            $data['petugas_id'] = auth()->id();
+        }
+
         // 3. Update record inventaris utama
         $record->update($data);
+
+        // 4. Sync components to pc_components table
+        $record->syncPcComponents($detailsData);
 
         return $record;
     }

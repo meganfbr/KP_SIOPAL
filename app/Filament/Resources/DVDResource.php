@@ -57,6 +57,12 @@ class DVDResource extends Resource
 
     protected static ?int $navigationSort = 6;
 
+
+    public static function shouldRegisterNavigation(): bool
+    {
+        return auth()->user()?->hasRole('super_admin') ?? false;
+    }
+
     public static function form(Form $form): Form
     {
         return $form

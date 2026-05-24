@@ -189,7 +189,8 @@ class RekapInventaris extends Page implements HasForms, HasActions
             ->label('Download Data')
             ->icon('heroicon-o-arrow-down-tray')
             ->color('success')
-            ->button(),
+            ->button()
+            ->visible(fn() => auth()->user()->hasRole('super_admin')),
 
             Action::make('ajukanLaporanPdf')
                 ->label('Ajukan Laporan')
@@ -213,11 +214,31 @@ class RekapInventaris extends Page implements HasForms, HasActions
                 ->color('primary')
                 ->visible(fn() => auth()->user()->hasRole('super_admin')),
 
+            Action::make('buatPeriodeBaru')
+                ->label('Buat Periode Baru')
+                ->icon('heroicon-o-plus')
+                ->color('success')
+                ->visible(fn() => auth()->user()->hasRole('super_admin'))
+                ->form([
+                    \Filament\Forms\Components\Select::make('bulan')
+                        ->options([1=>'Januari',2=>'Februari',3=>'Maret',4=>'April',5=>'Mei',6=>'Juni',7=>'Juli',8=>'Agustus',9=>'September',10=>'Oktober',11=>'November',12=>'Desember'])
+                        ->required()
+                        ->default(now()->month),
+                    \Filament\Forms\Components\TextInput::make('tahun')
+                        ->numeric()
+                        ->required()
+                        ->default(now()->year),
+                ])
+                ->action(function (array $data) {
+                    $periode = $this->getOrCreatePeriode($data['bulan'], $data['tahun'], $this->laboratoriumId);
+                    $this->redirect(static::getUrl(['periode_id' => $periode->id]));
+                }),
+
             Action::make('copyBulanSebelumnya')
                 ->label('Copy Bulan Lalu')
                 ->icon('heroicon-o-document-duplicate')
                 ->color('warning')
-                ->visible(!auth()->user()->hasRole('super_admin'))
+                ->visible(fn() => auth()->user()->hasRole('super_admin'))
                 ->requiresConfirmation()
                 ->action(function () {
                     $currentPeriod = RekapInventarisPeriode::findOrFail($this->periodeId);
@@ -235,15 +256,18 @@ class RekapInventaris extends Page implements HasForms, HasActions
                     $this->refresh();
                 }),
 
-            Action::make('hapusIsiHalaman')
-                ->label('Hapus Halaman')
-                ->icon('heroicon-o-trash')
-                ->color('danger')
+            Action::make('tarikDataMaster')
+                ->label('Tarik Data Master')
+                ->icon('heroicon-o-arrow-path')
+                ->color('info')
                 ->visible(!auth()->user()->hasRole('super_admin'))
                 ->requiresConfirmation()
+                ->modalHeading('Tarik Data Master?')
+                ->modalDescription('Semua rekap pada bulan ini akan DITIMPA dengan data master (Inventaris PC) yang paling terbaru. Lanjutkan?')
                 ->action(function () {
                     $this->deleteAllDataInPeriod($this->periodeId);
-                    Notification::make()->title('Berhasil')->body("Data dihapus.")->success()->send();
+                    $this->autoPopulateFromMaster($this->periodeId, $this->laboratoriumId);
+                    Notification::make()->title('Berhasil')->body("Data master berhasil ditarik untuk periode ini.")->success()->send();
                     $this->refresh();
                 }),
         ];
@@ -361,10 +385,80 @@ class RekapInventaris extends Page implements HasForms, HasActions
 
     protected function getOrCreatePeriode(int $bulan, int $tahun, ?int $labId): RekapInventarisPeriode
     {
-        return RekapInventarisPeriode::firstOrCreate(
+        $periode = RekapInventarisPeriode::firstOrCreate(
             ['bulan' => $bulan, 'tahun' => $tahun, 'laboratorium_id' => $labId],
             ['nama_periode' => $this->getNamaPeriode($bulan, $tahun)]
         );
+
+        if ($periode->wasRecentlyCreated) {
+            $this->autoPopulateFromMaster($periode->id, $labId);
+        }
+
+        return $periode;
+    }
+
+    protected function autoPopulateFromMaster(int $periodeId, ?int $labId): void
+    {
+        if (!$labId) return;
+
+        DB::transaction(function () use ($periodeId, $labId) {
+            $inventories = \App\Models\Inventory::where('laboratorium_id', $labId)
+                ->where('inventoriable_type', \App\Models\PCDetail::class)
+                ->with('pcComponents')
+                ->get();
+
+            $specService = resolve(\App\Services\RekapInventarisSpecService::class);
+
+            foreach ($inventories as $inv) {
+                $specDetails = [];
+                
+                $map = [
+                    'Motherboard' => 1,
+                    'Processor' => 2,
+                    'Hardisk' => 3, 
+                    'Penyimpanan' => 3,
+                    'VGA' => 4,
+                    'RAM' => 5,
+                    'DVD' => 6,
+                    'Keyboard' => 7,
+                    'Mouse' => 8,
+                    'Monitor' => 9,
+                ];
+
+                foreach ($inv->pcComponents as $comp) {
+                    $idx = $map[$comp->komponen] ?? null;
+                    if ($idx) {
+                        $specDetails[$idx] = [
+                            'detail' => $comp->detail_snapshot ?: $comp->merk_snapshot,
+                            'kondisi' => in_array($comp->kondisi, ['Baik', 'Kurang Baik', 'Rusak', 'Tidak Ada']) ? $comp->kondisi : 'Baik',
+                            'catatan_kondisi' => $comp->keterangan ?: '',
+                        ];
+                    }
+                }
+
+                $kondisiPc = $inv->kondisi ?: 'Baik';
+                if (!in_array($kondisiPc, ['Baik', 'Kurang Baik', 'Rusak', 'Tidak Ada'])) {
+                     $kondisiPc = 'Baik';
+                }
+
+                $spec = $specService->findOrCreate(
+                    $periodeId,
+                    $specDetails,
+                    $kondisiPc
+                );
+
+                \App\Models\RekapInventarisPc::create([
+                    'rekap_inventaris_periode_id' => $periodeId,
+                    'rekap_inventaris_spec_id' => $spec->id,
+                    'inventory_id' => $inv->id,
+                    'no_pc' => $inv->no_pc ?: 'Unknown',
+                    'lokasi' => 'Laboran',
+                    'kondisi' => $kondisiPc,
+                ]);
+            }
+
+            $specService->syncPeriodSpecOrder($periodeId);
+        });
     }
 
     protected function getPreviousPeriod(RekapInventarisPeriode $currentPeriod): ?RekapInventarisPeriode
@@ -415,6 +509,7 @@ class RekapInventaris extends Page implements HasForms, HasActions
                 RekapInventarisPc::create([
                     'rekap_inventaris_periode_id' => $toPeriodeId,
                     'rekap_inventaris_spec_id' => $specMap[$oldPc->rekap_inventaris_spec_id] ?? null,
+                    'inventory_id' => $oldPc->inventory_id,
                     'no_pc' => $oldPc->no_pc,
                     'lokasi' => $oldPc->lokasi,
                     'kondisi' => $oldPc->kondisi,

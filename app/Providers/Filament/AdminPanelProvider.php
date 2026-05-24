@@ -215,13 +215,16 @@ class AdminPanelProvider extends PanelProvider
                         ->url(fn() => \App\Filament\Pages\RekapInventaris::getUrl())
                         ->isActiveWhen(fn() => request()->routeIs('filament.admin.pages.rekap-inventaris'));
 
-                    // Inventaris PC (Superadmin Only)
-                    if ($user->hasRole('super_admin')) {
+                    // Inventaris PC (Super Admin & Laboran)
+                    if ($user->hasRole('super_admin') || $isLaboran) {
                         $masterDataItems[] = NavigationItem::make('Inventaris PC')
                             ->icon('heroicon-o-computer-desktop')
                             ->url(fn() => PCInventoryResource::getUrl('index'))
                             ->isActiveWhen(fn() => request()->routeIs(PCInventoryResource::getRouteBaseName() . '.*'));
+                    }
 
+                    // Inventaris Non-PC & Software (Superadmin Only)
+                    if ($user->hasRole('super_admin')) {
                         // Inventaris Non-PC
                         $masterDataItems[] = NavigationItem::make('Inventaris Non-PC')
                             ->icon('heroicon-o-cpu-chip')
@@ -269,7 +272,7 @@ class AdminPanelProvider extends PanelProvider
                 $hardwareItems = [];
 
                 // Motherboard
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'motherboard')) {
+                if (\App\Filament\Resources\MotherboardResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Motherboard')
                         ->icon('heroicon-o-cpu-chip')
                         ->url(\App\Filament\Resources\MotherboardResource::getUrl())
@@ -277,7 +280,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Processor
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'processor')) {
+                if (\App\Filament\Resources\ProcessorResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Processor')
                         ->icon('heroicon-o-cpu-chip')
                         ->url(\App\Filament\Resources\ProcessorResource::getUrl())
@@ -285,7 +288,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // RAM
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'r::a::m')) {
+                if (\App\Filament\Resources\RAMResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('RAM')
                         ->icon('heroicon-o-server-stack')
                         ->url(\App\Filament\Resources\RAMResource::getUrl())
@@ -293,7 +296,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // VGA
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'v::g::a')) {
+                if (\App\Filament\Resources\VGAResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('VGA')
                         ->icon('heroicon-o-chart-bar')
                         ->url(\App\Filament\Resources\VGAResource::getUrl())
@@ -301,7 +304,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Penyimpanan
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'penyimpanan')) {
+                if (\App\Filament\Resources\PenyimpananResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Penyimpanan')
                         ->icon('heroicon-o-circle-stack')
                         ->url(\App\Filament\Resources\PenyimpananResource::getUrl())
@@ -309,7 +312,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // DVD
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'd::v::d')) {
+                if (\App\Filament\Resources\DVDResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('DVD')
                         ->icon('heroicon-o-document')
                         ->url(\App\Filament\Resources\DVDResource::getUrl())
@@ -317,7 +320,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // PSU
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'p::s::u')) {
+                if (\App\Filament\Resources\PSUResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('PSU')
                         ->icon('heroicon-o-cube')
                         ->url(\App\Filament\Resources\PSUResource::getUrl())
@@ -325,7 +328,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Keyboard
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'keyboard')) {
+                if (\App\Filament\Resources\KeyboardResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Keyboard')
                         ->icon('heroicon-o-command-line')
                         ->url(\App\Filament\Resources\KeyboardResource::getUrl())
@@ -333,7 +336,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Mouse
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'mouse')) {
+                if (\App\Filament\Resources\MouseResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Mouse')
                         ->icon('heroicon-o-cursor-arrow-rays')
                         ->url(\App\Filament\Resources\MouseResource::getUrl())
@@ -341,7 +344,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Monitor
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'monitor')) {
+                if (\App\Filament\Resources\MonitorResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Monitor')
                         ->icon('heroicon-o-tv')
                         ->url(\App\Filament\Resources\MonitorResource::getUrl())
@@ -349,7 +352,7 @@ class AdminPanelProvider extends PanelProvider
                 }
 
                 // Headphone
-                if ($user->hasRole('super_admin') || $isLaboran || $user->can('view-navigation-item', 'headphone')) {
+                if (\App\Filament\Resources\HeadphoneResource::shouldRegisterNavigation()) {
                     $hardwareItems[] = NavigationItem::make('Headphone')
                         ->icon('heroicon-o-speaker-wave')
                         ->url(\App\Filament\Resources\HeadphoneResource::getUrl())

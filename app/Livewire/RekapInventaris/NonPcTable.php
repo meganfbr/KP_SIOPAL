@@ -45,7 +45,7 @@ class NonPcTable extends Component implements HasForms, HasTable
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Inventaris Non-PC')
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(fn() => auth()->user()->hasRole('super_admin'))
                     ->modalHeading('Tambah Barang Non-PC ke Rekap')
                     ->form([
                         Select::make('non_pc_detail_id')
@@ -164,7 +164,7 @@ class NonPcTable extends Component implements HasForms, HasTable
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(fn() => auth()->user()->hasRole('super_admin'))
                     ->form([
                         TextInput::make('nama_barang')->readOnly(),
                         TextInput::make('merk_model')->readOnly(),
@@ -180,7 +180,7 @@ class NonPcTable extends Component implements HasForms, HasTable
                         Textarea::make('keterangan'),
                     ]),
                 Tables\Actions\DeleteAction::make()
-                    ->visible(!auth()->user()->hasRole('super_admin')),
+                    ->visible(fn() => auth()->user()->hasRole('super_admin')),
             ]);
     }
 

@@ -25,7 +25,7 @@ class LaporanPerbaikanResource extends Resource
 
     public static function shouldRegisterNavigation(): bool
     {
-        return auth()->user()?->hasRole('super_admin') ?? false;
+        return self::canAccess();
     }
 
     public static function canAccess(): bool
@@ -73,6 +73,12 @@ class LaporanPerbaikanResource extends Resource
                         Forms\Components\TextInput::make('ruang_lab')
                             ->label('Laboratorium')
                             ->disabled(),
+                        Forms\Components\TextInput::make('komponen')
+                            ->label('Komponen')
+                            ->disabled(),
+                        Forms\Components\TextInput::make('kondisi')
+                            ->label('Kondisi')
+                            ->disabled(),
                         Forms\Components\Select::make('prioritas')
                             ->options([
                                 'Rendah' => 'Rendah',
@@ -83,9 +89,10 @@ class LaporanPerbaikanResource extends Resource
                             ->required(),
                         Forms\Components\Select::make('status')
                             ->options([
-                                'Pending' => 'Pending',
+                                'Menunggu' => 'Menunggu',
                                 'Diproses' => 'Diproses',
                                 'Selesai' => 'Selesai',
+                                'Ditolak' => 'Ditolak',
                             ])
                             ->disabled(fn() => !auth()->user()->hasRole('super_admin'))
                             ->required(),
@@ -95,9 +102,6 @@ class LaporanPerbaikanResource extends Resource
                         Forms\Components\Textarea::make('keterangan')
                             ->label('Keterangan')
                             ->disabled(fn() => !auth()->user()->hasRole('super_admin')),
-                        Forms\Components\Placeholder::make('detail_komponen_rusak')
-                            ->label('Detail Komponen Rusak')
-                            ->content(fn ($record) => view('filament.components.komponen-rusak-detail', ['komponen' => $record->komponen_rusak])),
                     ])->columns(2),
             ]);
     }
@@ -116,29 +120,27 @@ class LaporanPerbaikanResource extends Resource
                 Tables\Columns\TextColumn::make('ruang_lab')
                     ->label('Laboratorium')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('komponen_rusak')
+                Tables\Columns\TextColumn::make('komponen')
                     ->label('Komponen')
-                    ->state(fn ($record) => collect($record->komponen_rusak)->map(function($item) {
+                    ->state(fn ($record) => $record->komponen ?: (collect($record->komponen_rusak)->map(function($item) {
                         return is_array($item) ? $item['komponen'] : $item;
-                    })->join(', '))
+                    })->join(', ')))
                     ->badge()
-                    ->color('danger')
-                    ->separator(','),
-                Tables\Columns\TextColumn::make('keterangan_komponen')
-                    ->label('Rincian Kerusakan')
-                    ->state(fn ($record) => collect($record->komponen_rusak)->map(function($item) {
-                        if (is_array($item)) {
-                            $desc = !empty($item['keterangan']) ? $item['keterangan'] : '-';
-                            return "{$item['komponen']}: {$desc}";
-                        }
-                        return "{$item}: -";
-                    }))
-                    ->listWithLineBreaks()
-                    ->bulleted()
-                    ->wrap(),
+                    ->color('danger'),
+                Tables\Columns\TextColumn::make('kondisi')
+                    ->label('Kondisi')
+                    ->state(fn ($record) => $record->kondisi ?: (collect($record->komponen_rusak)->map(function($item) {
+                        return is_array($item) ? $item['kondisi'] : 'Rusak';
+                    })->join(', ')))
+                    ->badge()
+                    ->color(fn ($state) => match($state) {
+                        'Kurang Baik' => 'warning',
+                        'Rusak' => 'danger',
+                        'Tidak Ada' => 'gray',
+                        default => 'success',
+                    }),
                 Tables\Columns\TextColumn::make('keterangan')
-                    ->label('Catatan Pelapor')
-                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->label('Keterangan')
                     ->wrap(),
                 Tables\Columns\TextColumn::make('prioritas')
                     ->badge()
@@ -151,9 +153,10 @@ class LaporanPerbaikanResource extends Resource
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn ($state) => match($state) {
-                        'Pending' => 'gray',
+                        'Menunggu' => 'gray',
                         'Diproses' => 'warning',
                         'Selesai' => 'success',
+                        'Ditolak' => 'danger',
                         default => 'gray',
                     }),
             ])
@@ -165,9 +168,10 @@ class LaporanPerbaikanResource extends Resource
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
-                        'Pending' => 'Pending',
+                        'Menunggu' => 'Menunggu',
                         'Diproses' => 'Diproses',
                         'Selesai' => 'Selesai',
+                        'Ditolak' => 'Ditolak',
                     ]),
             ], layout: Tables\Enums\FiltersLayout::AboveContent)
             ->filtersFormColumns(2)
@@ -260,6 +264,32 @@ class LaporanPerbaikanResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('export_single_pdf')
+                    ->label('Cetak PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->color('info')
+                    ->action(function (LaporanPerbaikan $record) {
+                        $periodeText = $record->periode 
+                            ? \Illuminate\Support\Carbon::create(null, $record->periode->bulan)->translatedFormat('F') . ' ' . $record->periode->tahun
+                            : '-';
+
+                        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.laporan-pengajuan-tunggal', [
+                            'lab' => $record->ruang_lab,
+                            'no_pc' => $record->no_pc,
+                            'komponen' => $record->komponen ?: (collect($record->komponen_rusak)->pluck('komponen')->join(', ')),
+                            'kondisi' => $record->kondisi ?: (collect($record->komponen_rusak)->pluck('kondisi')->join(', ')),
+                            'keterangan' => $record->keterangan,
+                            'periode' => $periodeText,
+                            'pelapor' => $record->user?->name ?: 'Laboran',
+                            'status' => $record->status,
+                            'tanggal' => $record->tanggal_pengajuan ? $record->tanggal_pengajuan->format('d M Y') : now()->format('d M Y'),
+                        ])->setPaper('a4', 'portrait');
+
+                        return response()->streamDownload(
+                            fn () => print($pdf->output()),
+                            "Laporan_Kerusakan_{$record->no_pc}_" . now()->format('YmdHis') . ".pdf"
+                        );
+                    }),
                 Tables\Actions\EditAction::make()
                     ->visible(fn () => auth()->user()->hasRole('super_admin')),
             ])

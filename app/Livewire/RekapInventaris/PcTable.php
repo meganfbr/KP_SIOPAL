@@ -69,12 +69,24 @@ class PcTable extends Component implements HasForms, HasTable
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah PC')
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(false)
                     ->modalWidth('7xl')
                     ->form($this->getPcFormSchema(isEdit: false))
                     ->using(function (array $data) {
                         $periodeId = $this->periodeId;
                         $service = resolve(\App\Services\RekapInventarisSpecService::class);
+
+                        $details = $data['spec_details'] ?? [];
+                        $kondisiList = collect($details)->pluck('kondisi')->filter()->toArray();
+                        $calculatedKondisi = 'Baik';
+                        if (in_array('Tidak Ada', $kondisiList)) {
+                            $calculatedKondisi = 'Tidak Ada';
+                        } elseif (in_array('Rusak', $kondisiList)) {
+                            $calculatedKondisi = 'Rusak';
+                        } elseif (in_array('Kurang Baik', $kondisiList)) {
+                            $calculatedKondisi = 'Kurang Baik';
+                        }
+                        $data['kondisi'] = $calculatedKondisi;
 
                         $spec = $service->findOrCreate(
                             $periodeId,
@@ -219,7 +231,7 @@ class PcTable extends Component implements HasForms, HasTable
                     ->hiddenLabel()
                     ->icon('img-copy-atas')
                     ->iconSize(\Filament\Support\Enums\IconSize::Large)
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(false)
                     ->color('info')
                     ->requiresConfirmation()
                     ->modalHeading('Copy ke Baris Sebelumnya?')
@@ -276,7 +288,7 @@ class PcTable extends Component implements HasForms, HasTable
                     ->hiddenLabel()
                     ->icon('img-copy-bawah')
                     ->iconSize(\Filament\Support\Enums\IconSize::Large)
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(false)
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('Copy ke Baris Berikutnya?')
@@ -361,6 +373,18 @@ class PcTable extends Component implements HasForms, HasTable
                         $periodeId = $this->periodeId;
                         $service = resolve(\App\Services\RekapInventarisSpecService::class);
 
+                        $details = $data['spec_details'] ?? [];
+                        $kondisiList = collect($details)->pluck('kondisi')->filter()->toArray();
+                        $calculatedKondisi = 'Baik';
+                        if (in_array('Tidak Ada', $kondisiList)) {
+                            $calculatedKondisi = 'Tidak Ada';
+                        } elseif (in_array('Rusak', $kondisiList)) {
+                            $calculatedKondisi = 'Rusak';
+                        } elseif (in_array('Kurang Baik', $kondisiList)) {
+                            $calculatedKondisi = 'Kurang Baik';
+                        }
+                        $data['kondisi'] = $calculatedKondisi;
+
                         $incomingFingerprint = $service->fingerprintFromDetails(
                             $data['spec_details'] ?? [],
                             $data['kondisi']
@@ -395,8 +419,91 @@ class PcTable extends Component implements HasForms, HasTable
                         return $record->fresh();
                     }),
 
+                Tables\Actions\Action::make('ajukanLaporan')
+                    ->label('Ajukan Laporan')
+                    ->icon('heroicon-o-megaphone')
+                    ->color('danger')
+                    ->visible(fn() => !auth()->user()->hasRole('super_admin'))
+                    ->disabled(fn(RekapInventarisPc $record) => collect($record->spec?->details ?? [])->filter(fn($detail) => !empty($detail->kondisi) && $detail->kondisi !== 'Baik')->isEmpty())
+                    ->form(function (RekapInventarisPc $record) {
+                        $problematic = collect($record->spec?->details ?? [])
+                            ->filter(fn($detail) => !empty($detail->kondisi) && $detail->kondisi !== 'Baik')
+                            ->mapWithKeys(fn($detail) => [$detail->komponen => "{$detail->komponen} ({$detail->kondisi})"])
+                            ->toArray();
+
+                        return [
+                            Select::make('komponen')
+                                ->label('Pilih Komponen Bermasalah')
+                                ->options($problematic)
+                                ->placeholder(empty($problematic) ? 'Tidak ada komponen bermasalah' : 'Pilih komponen...')
+                                ->required()
+                                ->live()
+                                ->afterStateUpdated(function ($state, $set, RekapInventarisPc $record) {
+                                    if ($state) {
+                                        $detail = collect($record->spec?->details ?? [])->firstWhere('komponen', $state);
+                                        if ($detail) {
+                                            $set('kondisi', $detail->kondisi);
+                                            $set('keterangan', $detail->catatan_kondisi);
+                                        }
+                                    }
+                                }),
+                            
+                            TextInput::make('kondisi')
+                                ->label('Kondisi Komponen')
+                                ->readOnly()
+                                ->required(),
+
+                            Select::make('prioritas')
+                                ->label('Prioritas')
+                                ->options([
+                                    'Rendah' => 'Rendah',
+                                    'Sedang' => 'Sedang',
+                                    'Tinggi' => 'Tinggi',
+                                ])
+                                ->default('Sedang')
+                                ->required(),
+
+                            Textarea::make('keterangan')
+                                ->label('Keterangan Kerusakan')
+                                ->required(),
+                        ];
+                    })
+                    ->action(function (RekapInventarisPc $record, array $data) {
+                        $labId = $this->laboratoriumId ?? $record->periode->laboratorium_id;
+                        $labName = \App\Models\Laboratorium::find($labId)?->ruang ?? 'Unknown';
+
+                        \App\Models\LaporanPerbaikan::create([
+                            'rekap_inventaris_pc_id' => $record->id,
+                            'inventory_id' => $record->inventory_id,
+                            'periode_id' => $record->rekap_inventaris_periode_id,
+                            'komponen' => $data['komponen'],
+                            'kondisi' => $data['kondisi'],
+                            'laboratorium_id' => $labId,
+                            'no_pc' => $record->no_pc,
+                            'ruang_lab' => $labName,
+                            'prioritas' => $data['prioritas'],
+                            'keterangan' => $data['keterangan'],
+                            'komponen_rusak' => [
+                                [
+                                    'komponen' => $data['komponen'],
+                                    'kondisi' => $data['kondisi'],
+                                    'keterangan' => $data['keterangan'],
+                                ]
+                            ],
+                            'status' => 'Menunggu',
+                            'tanggal_pengajuan' => now(),
+                            'user_id' => auth()->id(),
+                        ]);
+
+                        Notification::make()
+                            ->title('Laporan Berhasil Diajukan')
+                            ->body("Kerusakan komponen {$data['komponen']} pada PC {$record->no_pc} telah dilaporkan.")
+                            ->success()
+                            ->send();
+                    }),
+
                 Tables\Actions\DeleteAction::make()
-                    ->visible(!auth()->user()->hasRole('super_admin'))
+                    ->visible(false)
                     ->after(function () {
                         $periodeId = $this->periodeId;
                         $service = resolve(\App\Services\RekapInventarisSpecService::class);
@@ -549,13 +656,22 @@ class PcTable extends Component implements HasForms, HasTable
                     ])
                     ->required(),
 
-                Select::make('kondisi')
-                    ->label('Kondisi')
-                    ->options([
-                        'Baik' => 'Baik',
-                        'Rusak' => 'Rusak',
-                    ])
-                    ->required(),
+                Placeholder::make('kondisi_placeholder')
+                    ->label('Kondisi PC (Otomatis)')
+                    ->content(function (Get $get) {
+                        $details = $get('spec_details') ?? [];
+                        $kondisiList = collect($details)->pluck('kondisi')->filter()->toArray();
+                        if (in_array('Tidak Ada', $kondisiList)) {
+                            return 'Tidak Ada';
+                        }
+                        if (in_array('Rusak', $kondisiList)) {
+                            return 'Rusak';
+                        }
+                        if (in_array('Kurang Baik', $kondisiList)) {
+                            return 'Kurang Baik';
+                        }
+                        return 'Baik';
+                    }),
             ]),
 
             Section::make('Detail Spesifikasi')
@@ -607,6 +723,7 @@ class PcTable extends Component implements HasForms, HasTable
                                 'Baik'       => 'Baik',
                                 'Kurang Baik' => 'Kurang Baik',
                                 'Rusak'      => 'Rusak',
+                                'Tidak Ada'  => 'Tidak Ada',
                             ])
                             ->placeholder('-')
                             ->nullable()

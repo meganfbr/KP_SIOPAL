@@ -46,6 +46,38 @@ class Inventory extends Model
     }
 
     /**
+     * Relasi ke lokasi laboratorium saat ini.
+     */
+    public function lokasi(): BelongsTo
+    {
+        return $this->belongsTo(Laboratorium::class, 'lokasi_id');
+    }
+
+    /**
+     * Relasi ke lokasi laboratorium asal/sebelumnya.
+     */
+    public function asal(): BelongsTo
+    {
+        return $this->belongsTo(Laboratorium::class, 'asal_id');
+    }
+
+    /**
+     * Relasi ke petugas terkait (User).
+     */
+    public function petugas(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'petugas_id');
+    }
+
+    /**
+     * Relasi ke komponen PC (PcComponent).
+     */
+    public function pcComponents(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(PcComponent::class, 'inventory_id');
+    }
+
+    /**
      * The "booted" method of the model.
      *
      * @return void
@@ -93,44 +125,71 @@ class Inventory extends Model
 
             // Generate nomor inventaris untuk PCDetail
             if ($inventory->inventoriable_type === 'App\Models\PCDetail') {
-                $lastNumber = $getLastNumber(
-                    self::where('laboratorium_id', $inventory->laboratorium_id)
-                        ->where('inventoriable_type', 'App\Models\PCDetail')
-                        ->whereNotNull('kode_inventaris')
-                );
+                if (empty($inventory->kode_inventaris)) {
+                    $lastNumber = $getLastNumber(
+                        self::where('laboratorium_id', $inventory->laboratorium_id)
+                            ->where('inventoriable_type', 'App\Models\PCDetail')
+                            ->whereNotNull('kode_inventaris')
+                    );
 
-                $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
+                    $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
 
-                // Format: UDN/LABKOM/INV/namalab/PC01
-                $inventory->kode_inventaris = "UDN/LABKOM/INV/{$namaLab}/PC{$nomorUrut}";
+                    // Format: UDN/LABKOM/INV/namalab/PC01
+                    $inventory->kode_inventaris = "UDN/LABKOM/INV/{$namaLab}/PC{$nomorUrut}";
+                }
+
+                // Auto-generate kode_pc: 4 digit display (e.g. 0001, 0002)
+                if (empty($inventory->kode_pc)) {
+                    $maxKodePc = (int) self::where('inventoriable_type', 'App\Models\PCDetail')->max('kode_pc');
+                    $inventory->kode_pc = str_pad($maxKodePc + 1, 4, '0', STR_PAD_LEFT);
+                }
+
+                // Sync lokasi_id with laboratorium_id
+                if (empty($inventory->lokasi_id)) {
+                    $inventory->lokasi_id = $inventory->laboratorium_id;
+                }
+
+                // Auto-generate no_pc: {lab_code}/{3_digit_urut}
+                if (empty($inventory->no_pc) && $laboratorium) {
+                    $labCode = strtoupper(str_replace(['LAB ', ' '], '', $laboratorium->ruang));
+                    $activeCount = self::where('inventoriable_type', 'App\Models\PCDetail')
+                        ->where('laboratorium_id', $inventory->laboratorium_id)
+                        ->count();
+                    $nomorUrutPosisi = str_pad($activeCount + 1, 3, '0', STR_PAD_LEFT);
+                    $inventory->no_pc = "{$labCode}/{$nomorUrutPosisi}";
+                }
             }
 
             // Generate nomor inventaris untuk NonPCDetail
             if ($inventory->inventoriable_type === 'App\Models\NonPCDetail') {
-                $lastNumber = $getLastNumber(
-                    self::where('laboratorium_id', $inventory->laboratorium_id)
-                        ->where('inventoriable_type', 'App\Models\NonPCDetail')
-                        ->whereNotNull('kode_inventaris')
-                );
+                if (empty($inventory->kode_inventaris)) {
+                    $lastNumber = $getLastNumber(
+                        self::where('laboratorium_id', $inventory->laboratorium_id)
+                            ->where('inventoriable_type', 'App\Models\NonPCDetail')
+                            ->whereNotNull('kode_inventaris')
+                    );
 
-                $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
+                    $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
 
-                // Format: UDN/LABKOM/INV/NON-PC/namalab/01
-                $inventory->kode_inventaris = "UDN/LABKOM/INV/NON-PC/{$namaLab}/{$nomorUrut}";
+                    // Format: UDN/LABKOM/INV/NON-PC/namalab/01
+                    $inventory->kode_inventaris = "UDN/LABKOM/INV/NON-PC/{$namaLab}/{$nomorUrut}";
+                }
             }
 
             // Generate nomor inventaris untuk SoftwareDetail
             if ($inventory->inventoriable_type === 'App\Models\SoftwareDetail') {
-                $lastNumber = $getLastNumber(
-                    self::where('laboratorium_id', $inventory->laboratorium_id)
-                        ->where('inventoriable_type', 'App\Models\SoftwareDetail')
-                        ->whereNotNull('kode_inventaris')
-                );
+                if (empty($inventory->kode_inventaris)) {
+                    $lastNumber = $getLastNumber(
+                        self::where('laboratorium_id', $inventory->laboratorium_id)
+                            ->where('inventoriable_type', 'App\Models\SoftwareDetail')
+                            ->whereNotNull('kode_inventaris')
+                    );
 
-                $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
+                    $nomorUrut = str_pad($lastNumber + 1, 2, '0', STR_PAD_LEFT);
 
-                // Format: UDN/LABKOM/INV/SOFTWARE/namalab/01
-                $inventory->kode_inventaris = "UDN/LABKOM/INV/SOFTWARE/{$namaLab}/{$nomorUrut}";
+                    // Format: UDN/LABKOM/INV/SOFTWARE/namalab/01
+                    $inventory->kode_inventaris = "UDN/LABKOM/INV/SOFTWARE/{$namaLab}/{$nomorUrut}";
+                }
             }
         });
 
@@ -139,6 +198,121 @@ class Inventory extends Model
             if ($inventory->isDirty('kode_inventaris') && $inventory->getOriginal('kode_inventaris')) {
                 $inventory->kode_inventaris = $inventory->getOriginal('kode_inventaris');
             }
+
+            if ($inventory->inventoriable_type === 'App\Models\PCDetail') {
+                // If laboratorium_id or lokasi_id changes
+                if ($inventory->isDirty('laboratorium_id') || $inventory->isDirty('lokasi_id')) {
+                    $oldLabId = $inventory->getOriginal('laboratorium_id') ?? $inventory->getOriginal('lokasi_id');
+                    $newLabId = $inventory->isDirty('laboratorium_id') ? $inventory->laboratorium_id : $inventory->lokasi_id;
+
+                    $inventory->laboratorium_id = $newLabId;
+                    $inventory->lokasi_id = $newLabId;
+                    $inventory->asal_id = $oldLabId;
+
+                    // Re-generate no_pc
+                    $lab = Laboratorium::find($newLabId);
+                    if ($lab) {
+                        $labCode = strtoupper(str_replace(['LAB ', ' '], '', $lab->ruang));
+                        $activeCount = self::where('inventoriable_type', 'App\Models\PCDetail')
+                            ->where('laboratorium_id', $newLabId)
+                            ->count();
+                        $nomorUrutPosisi = str_pad($activeCount + 1, 3, '0', STR_PAD_LEFT);
+                        $inventory->no_pc = "{$labCode}/{$nomorUrutPosisi}";
+                    }
+                }
+            }
         });
+    }
+
+    /**
+     * Sinkronisasi komponen PC ke tabel pc_components.
+     */
+    public function syncPcComponents(array $detailsData): void
+    {
+        $mappings = [
+            'processor_id' => [
+                'komponen' => 'Processor',
+                'category' => 'processor',
+                'model' => \App\Models\Processor::class,
+            ],
+            'motherboard_id' => [
+                'komponen' => 'Motherboard',
+                'category' => 'motherboard',
+                'model' => \App\Models\Motherboard::class,
+            ],
+            'ram_id' => [
+                'komponen' => 'RAM',
+                'category' => 'ram',
+                'model' => \App\Models\RAM::class,
+            ],
+            'penyimpanan_id' => [
+                'komponen' => 'Penyimpanan',
+                'category' => 'penyimpanan',
+                'model' => \App\Models\Penyimpanan::class,
+            ],
+            'vga_id' => [
+                'komponen' => 'VGA',
+                'category' => 'vga',
+                'model' => \App\Models\VGA::class,
+            ],
+            'psu_id' => [
+                'komponen' => 'PSU',
+                'category' => 'psu',
+                'model' => \App\Models\PSU::class,
+            ],
+            'keyboard_id' => [
+                'komponen' => 'Keyboard',
+                'category' => 'keyboard',
+                'model' => \App\Models\Keyboard::class,
+            ],
+            'mouse_id' => [
+                'komponen' => 'Mouse',
+                'category' => 'mouse',
+                'model' => \App\Models\Mouse::class,
+            ],
+            'monitor_id' => [
+                'komponen' => 'Monitor',
+                'category' => 'monitor',
+                'model' => \App\Models\Monitor::class,
+            ],
+            'dvd_id' => [
+                'komponen' => 'DVD',
+                'category' => 'dvd',
+                'model' => \App\Models\DVD::class,
+            ],
+            'headphone_id' => [
+                'komponen' => 'Headphone',
+                'category' => 'headphone',
+                'model' => \App\Models\Headphone::class,
+            ],
+        ];
+
+        foreach ($mappings as $key => $config) {
+            $hardwareId = $detailsData[$key] ?? null;
+
+            if ($hardwareId) {
+                $componentModel = $config['model'];
+                $componentRecord = $componentModel::find($hardwareId);
+
+                if ($componentRecord) {
+                    \App\Models\PcComponent::updateOrCreate(
+                        [
+                            'inventory_id' => $this->id,
+                            'hardware_category' => $config['category'],
+                        ],
+                        [
+                            'komponen' => $config['komponen'],
+                            'hardware_id' => $hardwareId,
+                            'merk_snapshot' => $componentRecord->merk ?? null,
+                            'detail_snapshot' => $componentRecord->full_name ?? ($componentRecord->tipe ?? null),
+                        ]
+                    );
+                }
+            } else {
+                \App\Models\PcComponent::where('inventory_id', $this->id)
+                    ->where('hardware_category', $config['category'])
+                    ->delete();
+            }
+        }
     }
 }

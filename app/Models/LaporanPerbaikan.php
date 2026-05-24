@@ -19,6 +19,10 @@ class LaporanPerbaikan extends Model
 
     protected $fillable = [
         'rekap_inventaris_pc_id',
+        'inventory_id',
+        'periode_id',
+        'komponen',
+        'kondisi',
         'laboratorium_id',
         'no_pc',
         'ruang_lab',
@@ -38,7 +42,7 @@ class LaporanPerbaikan extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['no_pc', 'ruang_lab', 'prioritas', 'status'])
+            ->logOnly(['no_pc', 'ruang_lab', 'prioritas', 'status', 'inventory_id', 'periode_id'])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn(string $eventName) => "Laporan Perbaikan telah di-{$eventName}")
             ->useLogName('laporan-perbaikan');
@@ -47,6 +51,16 @@ class LaporanPerbaikan extends Model
     public function rekapPc(): BelongsTo
     {
         return $this->belongsTo(RekapInventarisPc::class, 'rekap_inventaris_pc_id');
+    }
+
+    public function inventory(): BelongsTo
+    {
+        return $this->belongsTo(Inventory::class, 'inventory_id');
+    }
+
+    public function periode(): BelongsTo
+    {
+        return $this->belongsTo(RekapInventarisPeriode::class, 'periode_id');
     }
 
     public function laboratorium(): BelongsTo

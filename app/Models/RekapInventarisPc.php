@@ -16,6 +16,7 @@ class RekapInventarisPc extends Model
     protected $fillable = [
         'rekap_inventaris_periode_id',
         'rekap_inventaris_spec_id',
+        'inventory_id',
         'no_pc',
         'lokasi',
         'kondisi',
@@ -24,7 +25,7 @@ class RekapInventarisPc extends Model
     public function getActivitylogOptions(): LogOptions
     {
         return LogOptions::defaults()
-            ->logOnly(['no_pc', 'lokasi', 'kondisi', 'rekap_inventaris_spec_id'])
+            ->logOnly(['no_pc', 'lokasi', 'kondisi', 'rekap_inventaris_spec_id', 'inventory_id'])
             ->logOnlyDirty()
             ->setDescriptionForEvent(fn(string $eventName) => "Rekap PC telah di-{$eventName}")
             ->useLogName('rekap-inventaris');
@@ -38,5 +39,10 @@ class RekapInventarisPc extends Model
     public function spec(): BelongsTo
     {
         return $this->belongsTo(RekapInventarisSpec::class, 'rekap_inventaris_spec_id');
+    }
+
+    public function inventory(): BelongsTo
+    {
+        return $this->belongsTo(Inventory::class, 'inventory_id');
     }
 }

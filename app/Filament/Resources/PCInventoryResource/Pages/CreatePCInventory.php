@@ -36,8 +36,19 @@ class CreatePCInventory extends CreateRecord
         $data['inventoriable_id'] = $pcDetail->id;
         $data['inventoriable_type'] = PCDetail::class;
 
+        // Sync lokasi_id and petugas_id
+        $data['lokasi_id'] = $data['laboratorium_id'];
+        if (auth()->check()) {
+            $data['petugas_id'] = auth()->id();
+        }
+
         // 4. Buat record inventaris
-        return static::getModel()::create($data);
+        $inventory = static::getModel()::create($data);
+
+        // 5. Sync components to pc_components table
+        $inventory->syncPcComponents($detailsData);
+
+        return $inventory;
     }
 
     protected function getRedirectUrl(): string

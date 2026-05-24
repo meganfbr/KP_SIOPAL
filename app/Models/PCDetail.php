@@ -39,21 +39,20 @@ class PCDetail extends Model
     public function dvd(): BelongsTo { return $this->belongsTo(DVD::class); }
     public function headphone(): BelongsTo { return $this->belongsTo(Headphone::class); }
 
-    /**
-     * Auto-generate nomor inventaris untuk PC Detail
-     */
     protected static function boot()
     {
         parent::boot();
 
         static::creating(function ($pcDetail) {
-            // Generate nomor inventaris untuk PC Detail
-            $lastId = self::max('id') + 1;
-            $kodeUnik = str_pad($lastId, 3, '0', STR_PAD_LEFT);
-            $tahun = date('Y');
+            if (empty($pcDetail->no_inventaris)) {
+                // Generate nomor inventaris untuk PC Detail
+                $lastId = self::max('id') + 1;
+                $kodeUnik = str_pad($lastId, 3, '0', STR_PAD_LEFT);
+                $tahun = date('Y');
 
-            // Format: PCDETAIL/001/2025
-            $pcDetail->no_inventaris = "PCDETAIL/{$kodeUnik}/{$tahun}";
+                // Format: PCDETAIL/001/2025
+                $pcDetail->no_inventaris = "PCDETAIL/{$kodeUnik}/{$tahun}";
+            }
         });
     }
 }
