@@ -7,11 +7,12 @@ use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Maatwebsite\Excel\Concerns\WithStyles;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
-class LaporanPerbaikanExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize
+class LaporanPerbaikanExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithStyles
 {
     protected $query;
-    protected $rowNumber = 1;
 
     public function __construct($query)
     {
@@ -20,48 +21,89 @@ class LaporanPerbaikanExport implements FromCollection, WithHeadings, WithMappin
 
     public function collection()
     {
-        return $this->query->get();
+        return $this->query->with('user')->get();
     }
 
     public function headings(): array
     {
         return [
-            'No',
-            'Tanggal Pengajuan',
+            'Tanggal',
+            'Lab',
             'No PC',
-            'Laboratorium',
-            'Komponen Rusak',
-            'Keterangan Per Komponen',
+            'Kode PC',
+            'Komponen',
+            'Kondisi',
+            'Keterangan Kerusakan',
             'Prioritas',
             'Status',
-            'Keterangan Tambahan',
+            'Pelapor',
         ];
     }
 
     public function map($laporan): array
     {
+        // For Komponen and Kondisi, sometimes they are inside komponen_rusak json, or just strings.
         $komponen = collect($laporan->komponen_rusak);
         
-        $namaKomponen = $komponen->map(function($item) {
+        $namaKomponen = $laporan->komponen ?: $komponen->map(function($item) {
             return is_array($item) ? $item['komponen'] : $item;
         })->join(', ');
 
-        $detailKeterangan = $komponen->map(function($item) {
-            return is_array($item) && !empty($item['keterangan']) 
-                ? "{$item['komponen']}: {$item['keterangan']}" 
-                : null;
-        })->filter()->join('; ');
+        $kondisi = $laporan->kondisi ?: $komponen->map(function($item) {
+            return is_array($item) && isset($item['kondisi']) ? $item['kondisi'] : 'Rusak';
+        })->join(', ');
 
         return [
-            $this->rowNumber++,
-            $laporan->tanggal_pengajuan->format('d/m/Y'),
-            $laporan->no_pc,
+            $laporan->tanggal_pengajuan ? $laporan->tanggal_pengajuan->format('Y-m-d') : '',
             $laporan->ruang_lab,
+            $laporan->no_pc,
+            $laporan->kode_pc ?: '-',
             $namaKomponen,
-            $detailKeterangan ?: '-',
+            $kondisi,
+            $laporan->keterangan ?: '-',
             $laporan->prioritas,
             $laporan->status,
-            $laporan->keterangan ?: '-',
+            $laporan->user ? $laporan->user->name : '-',
         ];
+    }
+
+    public function styles(Worksheet $sheet)
+    {
+        // Add borders and styling
+        $highestRow = $sheet->getHighestRow();
+        $highestColumn = $sheet->getHighestColumn();
+        $range = 'A1:' . $highestColumn . $highestRow;
+
+        $sheet->setAutoFilter('A1:' . $highestColumn . '1');
+
+        $sheet->getStyle('A1:' . $highestColumn . '1')->applyFromArray([
+            'font' => [
+                'bold' => true,
+                'color' => ['argb' => 'FFFFFFFF'],
+            ],
+            'fill' => [
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
+                'color' => ['argb' => 'FF4F81BD'], // Soft blue
+            ],
+        ]);
+
+        $sheet->getStyle($range)->applyFromArray([
+            'borders' => [
+                'allBorders' => [
+                    'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN,
+                    'color' => ['argb' => 'FF000000'],
+                ],
+            ],
+            'alignment' => [
+                'vertical' => \PhpOffice\PhpSpreadsheet\Style\Alignment::VERTICAL_CENTER,
+                'wrapText' => true,
+            ],
+        ]);
+        
+        $sheet->getStyle('A2:A' . $highestRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('C2:C' . $highestRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+        $sheet->getStyle('D2:D' . $highestRow)->getAlignment()->setHorizontal(\PhpOffice\PhpSpreadsheet\Style\Alignment::HORIZONTAL_CENTER);
+
+        return [];
     }
 }

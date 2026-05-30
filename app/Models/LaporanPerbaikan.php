@@ -5,13 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\LogOptions;
 use Spatie\Activitylog\Traits\LogsActivity;
-use App\Traits\HasActivityLog;
 
 class LaporanPerbaikan extends Model
 {
-    use HasFactory, LogsActivity, HasActivityLog;
+    use HasFactory, LogsActivity;
 
     protected $activityModul = 'Laporan Perbaikan';
 
@@ -25,6 +25,7 @@ class LaporanPerbaikan extends Model
         'kondisi',
         'laboratorium_id',
         'no_pc',
+        'kode_pc',
         'ruang_lab',
         'prioritas',
         'keterangan',
@@ -71,5 +72,10 @@ class LaporanPerbaikan extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function logs(): HasMany
+    {
+        return $this->hasMany(LaporanPerbaikanLog::class, 'laporan_perbaikan_id')->orderBy('created_at', 'asc');
     }
 }

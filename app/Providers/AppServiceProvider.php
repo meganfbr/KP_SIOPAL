@@ -7,6 +7,8 @@ use BladeUI\Icons\Factory;
 
 use Illuminate\Support\Facades\Event;
 use App\Listeners\LogAuthenticationActions;
+use App\Models\LaporanPerbaikan;
+use App\Observers\LaporanPerbaikanObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +26,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Event::subscribe(LogAuthenticationActions::class);
+
+        // Register Observers
+        LaporanPerbaikan::observe(LaporanPerbaikanObserver::class);
 
         $this->callAfterResolving(Factory::class, function (Factory $factory) {
             $factory->add('img', [

@@ -423,11 +423,11 @@ class PcTable extends Component implements HasForms, HasTable
                     ->label('Ajukan Laporan')
                     ->icon('heroicon-o-megaphone')
                     ->color('danger')
-                    ->visible(fn() => !auth()->user()->hasRole('super_admin'))
-                    ->disabled(fn(RekapInventarisPc $record) => collect($record->spec?->details ?? [])->filter(fn($detail) => !empty($detail->kondisi) && $detail->kondisi !== 'Baik')->isEmpty())
+                    ->visible(fn() => auth()->user() && !auth()->user()->hasRole('super_admin'))
+                    ->disabled(fn(RekapInventarisPc $record) => collect($record->spec?->details ?? [])->filter(fn($detail) => in_array($detail->kondisi, ['Kurang Baik', 'Rusak', 'Tidak Ada']))->isEmpty())
                     ->form(function (RekapInventarisPc $record) {
                         $problematic = collect($record->spec?->details ?? [])
-                            ->filter(fn($detail) => !empty($detail->kondisi) && $detail->kondisi !== 'Baik')
+                            ->filter(fn($detail) => in_array($detail->kondisi, ['Kurang Baik', 'Rusak', 'Tidak Ada']))
                             ->mapWithKeys(fn($detail) => [$detail->komponen => "{$detail->komponen} ({$detail->kondisi})"])
                             ->toArray();
 
@@ -480,6 +480,7 @@ class PcTable extends Component implements HasForms, HasTable
                             'kondisi' => $data['kondisi'],
                             'laboratorium_id' => $labId,
                             'no_pc' => $record->no_pc,
+                            'kode_pc' => $record->inventory?->kode_pc,
                             'ruang_lab' => $labName,
                             'prioritas' => $data['prioritas'],
                             'keterangan' => $data['keterangan'],
@@ -516,7 +517,7 @@ class PcTable extends Component implements HasForms, HasTable
                         ->label('Laporkan Perbaikan')
                         ->icon('heroicon-o-megaphone')
                         ->color('danger')
-                        ->visible(!auth()->user()->hasRole('super_admin'))
+                        ->visible(fn() => auth()->user() && !auth()->user()->hasRole('super_admin'))
                         ->modalHeading('Konfirmasi Laporan Perbaikan')
                         ->modalDescription(fn (\Illuminate\Database\Eloquent\Collection $records) => new \Illuminate\Support\HtmlString('Anda akan melaporkan PC berikut: <strong>' . $records->pluck('no_pc')->join(', ') . '</strong>. Apakah Anda yakin ingin melanjutkan?\\nLaporan PDF PTPP akan diunduh setelah konfirmasi.'))
                         ->modalSubmitActionLabel('Kirim & Unduh Laporan')
@@ -576,19 +577,23 @@ class PcTable extends Component implements HasForms, HasTable
 
                                 \App\Models\LaporanPerbaikan::create([
                                     'rekap_inventaris_pc_id' => $record->id,
+                                    'inventory_id' => $record->inventory_id,
+                                    'periode_id' => $record->rekap_inventaris_periode_id,
                                     'laboratorium_id' => $labId,
                                     'no_pc' => $record->no_pc,
+                                    'kode_pc' => $record->inventory?->kode_pc,
                                     'ruang_lab' => $labName,
                                     'prioritas' => 'Sedang',
                                     'komponen_rusak' => $komponenRusak,
                                     'keterangan' => $data['tindakan_langsung'],
-                                    'status' => 'Pending',
+                                    'status' => 'Menunggu',
                                     'tanggal_pengajuan' => now()->toDateString(),
                                     'user_id' => auth()->id(),
                                 ]);
                                 
                                 if (count($broken_components_list) > 0) {
-                                    $problematic_pcs[] = "- PC " . $record->no_pc . ": " . implode(', ', $broken_components_list);
+                                    $kodeStr = $record->inventory?->kode_pc ? " (Kode PC: " . $record->inventory->kode_pc . ")" : "";
+                                    $problematic_pcs[] = "- PC " . $record->no_pc . $kodeStr . ": " . implode(', ', $broken_components_list);
                                 }
                                 $count++;
                             }

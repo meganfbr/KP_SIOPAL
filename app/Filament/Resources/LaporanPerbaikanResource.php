@@ -70,6 +70,9 @@ class LaporanPerbaikanResource extends Resource
                         Forms\Components\TextInput::make('no_pc')
                             ->label('Nomor PC')
                             ->disabled(),
+                        Forms\Components\TextInput::make('kode_pc')
+                            ->label('Kode PC')
+                            ->disabled(),
                         Forms\Components\TextInput::make('ruang_lab')
                             ->label('Laboratorium')
                             ->disabled(),
@@ -100,7 +103,7 @@ class LaporanPerbaikanResource extends Resource
                             ->label('Tanggal Pengajuan')
                             ->disabled(),
                         Forms\Components\Textarea::make('keterangan')
-                            ->label('Keterangan')
+                            ->label('Keterangan Kerusakan')
                             ->disabled(fn() => !auth()->user()->hasRole('super_admin')),
                     ])->columns(2),
             ]);
@@ -116,6 +119,9 @@ class LaporanPerbaikanResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('no_pc')
                     ->label('No. PC')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('kode_pc')
+                    ->label('Kode PC')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('ruang_lab')
                     ->label('Laboratorium')
@@ -140,7 +146,7 @@ class LaporanPerbaikanResource extends Resource
                         default => 'success',
                     }),
                 Tables\Columns\TextColumn::make('keterangan')
-                    ->label('Keterangan')
+                    ->label('Keterangan Kerusakan')
                     ->wrap(),
                 Tables\Columns\TextColumn::make('prioritas')
                     ->badge()
@@ -214,7 +220,8 @@ class LaporanPerbaikanResource extends Resource
                                 }
                                 
                                 if (count($komponenRusakStr) > 0) {
-                                    $problematic_pcs[] = "- PC " . $record->no_pc . ": " . implode(', ', $komponenRusakStr);
+                                    $kodeStr = $record->kode_pc ? " (Kode PC: " . $record->kode_pc . ")" : "";
+                                    $problematic_pcs[] = "- PC " . $record->no_pc . $kodeStr . ": " . implode(', ', $komponenRusakStr);
                                 }
                             }
                             
@@ -276,6 +283,7 @@ class LaporanPerbaikanResource extends Resource
                         $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.laporan-pengajuan-tunggal', [
                             'lab' => $record->ruang_lab,
                             'no_pc' => $record->no_pc,
+                            'kode_pc' => $record->kode_pc ?: '-',
                             'komponen' => $record->komponen ?: (collect($record->komponen_rusak)->pluck('komponen')->join(', ')),
                             'kondisi' => $record->kondisi ?: (collect($record->komponen_rusak)->pluck('kondisi')->join(', ')),
                             'keterangan' => $record->keterangan,
@@ -304,7 +312,8 @@ class LaporanPerbaikanResource extends Resource
     public static function getPages(): array
     {
         return [
-            'index' => Pages\ManageLaporanPerbaikans::route('/'),
+            'index'  => Pages\ManageLaporanPerbaikans::route('/'),
+            'view'   => Pages\ViewLaporanPerbaikan::route('/{record}'),
         ];
     }
 }
