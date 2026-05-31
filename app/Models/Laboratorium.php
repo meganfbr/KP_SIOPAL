@@ -47,7 +47,8 @@ class Laboratorium extends Model
     {
         // Auto-create permissions when a new lab is created
         static::created(function (Laboratorium $lab) {
-            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], $lab->ruang));
+            $cleanedName = str_ireplace('LAB ', '', $lab->ruang);
+            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], trim($cleanedName)));
             $actions = ['view', 'manage', 'edit', 'delete'];
 
             foreach ($actions as $action) {
@@ -64,7 +65,8 @@ class Laboratorium extends Model
 
         // Auto-delete permissions when a lab is deleted
         static::deleting(function (Laboratorium $lab) {
-            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], $lab->ruang));
+            $cleanedName = str_ireplace('LAB ', '', $lab->ruang);
+            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], trim($cleanedName)));
 
             // Delete all permissions for this lab (format: lab_{slug}_*)
             \Spatie\Permission\Models\Permission::where('name', 'like', "lab_{$labSlug}_%")->delete();

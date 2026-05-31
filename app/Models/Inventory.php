@@ -70,11 +70,35 @@ class Inventory extends Model
     }
 
     /**
+     * Relasi ke user yang mengubah data (User).
+     */
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
      * Relasi ke komponen PC (PcComponent).
      */
     public function pcComponents(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(PcComponent::class, 'inventory_id');
+    }
+
+    /**
+     * Mengambil model komponen berdasarkan kategori hardware.
+     */
+    public function getComponent(string $category): ?PcComponent
+    {
+        return $this->pcComponents->where('hardware_category', $category)->first();
+    }
+
+    /**
+     * Mengambil nama spesifikasi/detail komponen berdasarkan kategori.
+     */
+    public function getComponentName(string $category): ?string
+    {
+        return $this->getComponent($category)?->detail_snapshot;
     }
 
     /**
@@ -107,6 +131,10 @@ class Inventory extends Model
 
         // Auto-generate nomor inventaris sebelum menyimpan
         static::creating(function ($inventory) {
+            if (Auth::check()) {
+                $inventory->updated_by = Auth::id();
+            }
+
             // Ambil nama laboratorium
             $laboratorium = Laboratorium::find($inventory->laboratorium_id);
             $namaLab = $laboratorium ? strtoupper($laboratorium->ruang) : 'LAB';
@@ -194,6 +222,10 @@ class Inventory extends Model
         });
 
         static::updating(function ($inventory) {
+            if (Auth::check()) {
+                $inventory->updated_by = Auth::id();
+            }
+
             // Jangan ubah nomor inventaris saat update
             if ($inventory->isDirty('kode_inventaris') && $inventory->getOriginal('kode_inventaris')) {
                 $inventory->kode_inventaris = $inventory->getOriginal('kode_inventaris');

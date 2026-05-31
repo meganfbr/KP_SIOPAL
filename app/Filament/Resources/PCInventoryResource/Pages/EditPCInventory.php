@@ -10,11 +10,32 @@ class EditPCInventory extends EditRecord
 {
     protected static string $resource = PCInventoryResource::class;
 
-    protected function fillForm(): void
+    protected function mutateFormDataBeforeFill(array $data): array
     {
-        parent::fillForm();
-        // Mengisi form 'details' dengan data dari relasi inventoriable
-        $this->form->fill(['details' => $this->record->inventoriable->toArray()]);
+        $details = [];
+        $mappings = [
+            'processor_id' => 'processor',
+            'motherboard_id' => 'motherboard',
+            'ram_id' => 'ram',
+            'penyimpanan_id' => 'penyimpanan',
+            'vga_id' => 'vga',
+            'psu_id' => 'psu',
+            'keyboard_id' => 'keyboard',
+            'mouse_id' => 'mouse',
+            'monitor_id' => 'monitor',
+            'dvd_id' => 'dvd',
+            'headphone_id' => 'headphone',
+        ];
+
+        // Membaca spesifikasi langsung dari pc_components
+        foreach ($mappings as $key => $category) {
+            $component = $this->record->getComponent($category);
+            $details[$key] = $component ? $component->hardware_id : null;
+        }
+
+        $data['details'] = $details;
+
+        return $data;
     }
 
     protected function handleRecordUpdate(Model $record, array $data): Model

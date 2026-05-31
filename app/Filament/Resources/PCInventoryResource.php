@@ -29,6 +29,12 @@ class PCInventoryResource extends Resource
 {
     protected static ?string $model = Inventory::class;
 
+    public static function canViewAny(): bool
+    {
+        $user = auth()->user();
+        return $user->hasRole('super_admin') || $user->roles->pluck('name')->contains(fn ($name) => str_starts_with($name, 'Laboran_'));
+    }
+
     public static function canCreate(): bool
     {
         return auth()->user()->hasRole('super_admin');
@@ -36,7 +42,18 @@ class PCInventoryResource extends Resource
 
     public static function canEdit(Model $record): bool
     {
-        return auth()->user()->hasRole('super_admin');
+        $user = auth()->user();
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+        
+        $isLaboran = $user->roles->pluck('name')->contains(fn ($name) => str_starts_with($name, 'Laboran_'));
+        if ($isLaboran) {
+            // Laboran hanya boleh edit PC yang ada di wilayah/laboratorium mereka
+            return in_array($record->laboratorium_id, $user->getAuthorizedLabIds('view'));
+        }
+        
+        return false;
     }
 
     public static function canDelete(Model $record): bool
@@ -58,7 +75,7 @@ class PCInventoryResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $query = parent::getEloquentQuery()->where('inventoriable_type', PCDetail::class);
+        $query = parent::getEloquentQuery()->where('inventoriable_type', PCDetail::class)->with('pcComponents');
 
         // Filter by user's authorized labs
         $user = auth()->user();
@@ -78,13 +95,7 @@ class PCInventoryResource extends Resource
                     ->schema([
                         Select::make('laboratorium_id')
                             ->label('Laboratorium')
-                            ->relationship(
-                                'laboratorium',
-                                'ruang',
-                                fn(Builder $query) => auth()->user()->hasRole('super_admin')
-                                ? $query
-                                : $query->whereIn('id', auth()->user()->getAuthorizedLabIds('view'))
-                            )
+                            ->relationship('laboratorium', 'ruang')
                             ->required()
                             ->preload()
                             ->searchable()
@@ -150,7 +161,31 @@ class PCInventoryResource extends Resource
                             ->placeholder('Pilih laboratorium terlebih dahulu')
                             ->helperText('Nomor inventaris yang akan di-generate otomatis')
                             ->extraAttributes(['style' => 'background-color: #f3f4f6; font-weight: 500;']),
-                        DatePicker::make('tanggal_pengadaan'),
+                        TextInput::make('kode_pc')
+                            ->label('Kode PC')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->hiddenOn('create'),
+                        TextInput::make('no_pc')
+                            ->label('No PC')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->hiddenOn('create'),
+                        Select::make('asal_id')
+                            ->label('Asal PC')
+                            ->relationship('asal', 'ruang')
+                            ->disabled()
+                            ->dehydrated(false)
+                            ->placeholder('Pengadaan Baru')
+                            ->hiddenOn('create'),
+                        DatePicker::make('tanggal_pengadaan')
+                            ->disabled(fn () => !auth()->user()->hasRole('super_admin')),
+                        Select::make('petugas_id')
+                            ->label('Petugas')
+                            ->relationship('petugas', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->nullable(),
                         Select::make('kondisi')
                             ->options(['Baik' => 'Baik', 'Rusak Ringan' => 'Rusak Ringan', 'Rusak Berat' => 'Rusak Berat', 'Dalam Perbaikan' => 'Dalam Perbaikan'])
                             ->required()
@@ -334,6 +369,16 @@ class PCInventoryResource extends Resource
                     ->label('Petugas')
                     ->sortable()
                     ->placeholder('-'),
+                TextColumn::make('updated_at')
+                    ->label('Last Update')
+                    ->dateTime('d F Y H:i')
+                    ->sortable()
+                    ->searchable(),
+                TextColumn::make('updatedBy.name')
+                    ->label('Updated By')
+                    ->sortable()
+                    ->searchable()
+                    ->placeholder('Sistem'),
                 
                 // Existing columns as hidden by default
                 TextColumn::make('kode_inventaris')
@@ -341,17 +386,52 @@ class PCInventoryResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.processor.tipe')->label('CPU')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.ram.tipe')->label('RAM')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.motherboard.tipe')->label('Motherboard')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.penyimpanan.tipe')->label('Storage')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.vga.tipe')->label('VGA')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.psu.tipe')->label('PSU')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.keyboard.tipe')->label('Keyboard')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.mouse.tipe')->label('Mouse')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.monitor.tipe')->label('Monitor')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.dvd.tipe')->label('DVD')->toggleable(isToggledHiddenByDefault: true),
-                TextColumn::make('inventoriable.headphone.tipe')->label('Headphone')->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('processor_name')
+                    ->label('CPU')
+                    ->state(fn (Inventory $record) => $record->getComponentName('processor'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('ram_name')
+                    ->label('RAM')
+                    ->state(fn (Inventory $record) => $record->getComponentName('ram'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('motherboard_name')
+                    ->label('Motherboard')
+                    ->state(fn (Inventory $record) => $record->getComponentName('motherboard'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('penyimpanan_name')
+                    ->label('Storage')
+                    ->state(fn (Inventory $record) => $record->getComponentName('penyimpanan'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('vga_name')
+                    ->label('VGA')
+                    ->state(fn (Inventory $record) => $record->getComponentName('vga'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('psu_name')
+                    ->label('PSU')
+                    ->state(fn (Inventory $record) => $record->getComponentName('psu'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('keyboard_name')
+                    ->label('Keyboard')
+                    ->state(fn (Inventory $record) => $record->getComponentName('keyboard'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('mouse_name')
+                    ->label('Mouse')
+                    ->state(fn (Inventory $record) => $record->getComponentName('mouse'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('monitor_name')
+                    ->label('Monitor')
+                    ->state(fn (Inventory $record) => $record->getComponentName('monitor'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('dvd_name')
+                    ->label('DVD')
+                    ->state(fn (Inventory $record) => $record->getComponentName('dvd'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                TextColumn::make('headphone_name')
+                    ->label('Headphone')
+                    ->state(fn (Inventory $record) => $record->getComponentName('headphone'))
+                    ->toggleable(isToggledHiddenByDefault: true),
+                    
+
             ])
             ->filters([
                 SelectFilter::make('laboratorium')
@@ -374,10 +454,6 @@ class PCInventoryResource extends Resource
                         // Hapus record detail terkait sebelum menghapus record inventaris utama
                         $record->inventoriable?->delete();
                     }),
-                Tables\Actions\ReplicateAction::make()
-                    ->label('Duplikat')
-                    ->icon('heroicon-o-document-duplicate')
-                    ->color('success')
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -436,41 +512,66 @@ class PCInventoryResource extends Resource
                     ->description('Detail komponen hardware yang terpasang.')
                     ->schema([
                         InfoGrid::make(3)->schema([
-                            TextEntry::make('inventoriable.processor.full_name')
+                            TextEntry::make('processor_name')
                                 ->label('Processor')
+                                ->state(fn (Inventory $record) => $record->getComponentName('processor'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.motherboard.full_name')
+                            TextEntry::make('motherboard_name')
                                 ->label('Motherboard')
+                                ->state(fn (Inventory $record) => $record->getComponentName('motherboard'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.ram.full_name')
+                            TextEntry::make('ram_name')
                                 ->label('RAM')
+                                ->state(fn (Inventory $record) => $record->getComponentName('ram'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.penyimpanan.full_name')
+                            TextEntry::make('penyimpanan_name')
                                 ->label('Penyimpanan')
+                                ->state(fn (Inventory $record) => $record->getComponentName('penyimpanan'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.vga.full_name')
+                            TextEntry::make('vga_name')
                                 ->label('VGA')
+                                ->state(fn (Inventory $record) => $record->getComponentName('vga'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.psu.full_name')
+                            TextEntry::make('psu_name')
                                 ->label('PSU')
+                                ->state(fn (Inventory $record) => $record->getComponentName('psu'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.keyboard.full_name')
+                            TextEntry::make('keyboard_name')
                                 ->label('Keyboard')
+                                ->state(fn (Inventory $record) => $record->getComponentName('keyboard'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.mouse.full_name')
+                            TextEntry::make('mouse_name')
                                 ->label('Mouse')
+                                ->state(fn (Inventory $record) => $record->getComponentName('mouse'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.monitor.full_name')
+                            TextEntry::make('monitor_name')
                                 ->label('Monitor')
+                                ->state(fn (Inventory $record) => $record->getComponentName('monitor'))
                                 ->placeholder('-'),
-                            TextEntry::make('inventoriable.dvd.full_name')
+                            TextEntry::make('dvd_name')
                                 ->label('DVD')
+                                ->state(fn (Inventory $record) => $record->getComponentName('dvd'))
                                 ->placeholder('Tidak ada'),
-                            TextEntry::make('inventoriable.headphone.full_name')
+                            TextEntry::make('headphone_name')
                                 ->label('Headphone')
+                                ->state(fn (Inventory $record) => $record->getComponentName('headphone'))
                                 ->placeholder('Tidak ada'),
                         ]),
                     ]),
+                    
+                InfoSection::make('Audit Trail')
+                    ->description('Rekam jejak perubahan data inventaris.')
+                    ->visible(fn () => auth()->user()->hasRole('super_admin'))
+                    ->schema([
+                        TextEntry::make('updated_at')
+                            ->label('Terakhir Diubah Waktu')
+                            ->dateTime('d M Y, H:i:s'),
+                        TextEntry::make('updatedBy.name')
+                            ->label('Terakhir Diubah Oleh')
+                            ->placeholder('Sistem')
+                            ->badge()
+                            ->color('info'),
+                    ])->columns(2),
             ]);
     }
 

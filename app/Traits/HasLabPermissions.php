@@ -74,7 +74,8 @@ trait HasLabPermissions
 
             // For each lab, check if the user has the specific permission
             foreach ($laboratories as $lab) {
-                $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], $lab->ruang));
+                $cleanedName = str_ireplace('LAB ', '', $lab->ruang);
+                $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], trim($cleanedName)));
                 // Format: lab_{slug}_{action}
                 $permissionName = "lab_{$labSlug}_{$action}";
 

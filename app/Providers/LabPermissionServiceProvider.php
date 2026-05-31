@@ -59,7 +59,8 @@ class LabPermissionServiceProvider extends ServiceProvider
 
         // Create a permission for each lab and each action
         foreach ($laboratories as $lab) {
-            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], $lab->ruang));
+            $cleanedName = str_ireplace('LAB ', '', $lab->ruang);
+            $labSlug = strtolower(str_replace([' ', '.'], ['_', '_'], trim($cleanedName)));
 
             foreach ($labActions as $action => $actionLabel) {
                 // Format: lab_{lab_slug}_{action} - groups by lab in Shield

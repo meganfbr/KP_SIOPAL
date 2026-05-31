@@ -76,55 +76,9 @@ class ViewLaporanPerbaikan extends ViewRecord
                     // FIX 1: Hapus persistCollapsed() — section selalu terbuka
                     ->collapsible()
                     ->schema([
-                        RepeatableEntry::make('logs')
+                        \Filament\Infolists\Components\ViewEntry::make('logs')
                             ->label('')
-                            ->schema([
-                                TextEntry::make('created_at')
-                                    ->label('Waktu')
-                                    ->dateTime('d M Y, H:i')
-                                    ->weight(FontWeight::SemiBold),
-
-                                TextEntry::make('user.name')
-                                    ->label('Oleh')
-                                    ->default('—'),
-
-                                TextEntry::make('action')
-                                    ->label('Aksi')
-                                    ->badge()
-                                    ->formatStateUsing(fn ($state) => match($state) {
-                                        'create'        => 'Dibuat',
-                                        'update'        => 'Diperbarui',
-                                        'status_change' => 'Status Berubah',
-                                        'delete'        => 'Dihapus',
-                                        default         => $state,
-                                    })
-                                    ->color(fn ($state) => match($state) {
-                                        'create'        => 'success',
-                                        'update'        => 'info',
-                                        'status_change' => 'warning',
-                                        'delete'        => 'danger',
-                                        default         => 'gray',
-                                    }),
-
-                                TextEntry::make('description')
-                                    ->label('Keterangan')
-                                    ->columnSpanFull(),
-
-                                // FIX 2: Gunakan formatStateUsing untuk tampilkan perubahan nilai
-                                // tanpa visible() yang tidak reliable di dalam RepeatableEntry
-                                TextEntry::make('field_info')
-                                    ->label('Perubahan')
-                                    ->columnSpanFull()
-                                    ->getStateUsing(fn ($record) =>
-                                        filled($record->old_value) || filled($record->new_value)
-                                            ? ($record->old_value ?? '—') . ' → ' . ($record->new_value ?? '—')
-                                            : null
-                                    )
-                                    ->default(null)
-                                    ->hidden(fn ($record) => !filled($record->old_value) && !filled($record->new_value)),
-                            ])
-                            ->columns(3)
-                            ->contained(false),
+                            ->view('filament.infolists.components.timeline-log'),
                     ]),
             ]);
     }
