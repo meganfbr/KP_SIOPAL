@@ -30,7 +30,8 @@ class DatabaseSeeder extends Seeder
 
         $tahunSekarang = date('Y');
 
-        Headphone::insert([
+        if (Headphone::count() === 0) {
+            Headphone::insert([
             [
                 'no_inventaris' => 'LABKOM/HP/001/' . $tahunSekarang,
                 'merk' => 'Logitech',
@@ -122,9 +123,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(10, 30),
             ],
         ]);
+        }
 
         // Seeder Processors (Low-Mid End)
-        Processor::insert([
+        if (Processor::count() === 0) {
+            Processor::insert([
             [
                 'no_inventaris' => 'LABKOM/PR/001/' . $tahunSekarang,
                 'merk' => 'Intel',
@@ -206,9 +209,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(4, 10),
             ],
         ]);
+        }
 
         // Seeder VGA (Low-Mid End)
-        VGA::insert([
+        if (VGA::count() === 0) {
+            VGA::insert([
             [
                 'no_inventaris' => 'LABKOM/VGA/001/' . $tahunSekarang,
                 'merk' => 'NVIDIA',
@@ -310,9 +315,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(10, 25),
             ],
         ]);
+        }
 
         // Seeder RAM (Low-Mid End)
-        RAM::insert([
+        if (RAM::count() === 0) {
+            RAM::insert([
             [
                 'no_inventaris' => 'LABKOM/RAM/001/' . $tahunSekarang,
                 'merk' => 'Kingston',
@@ -404,9 +411,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(12, 30),
             ],
         ]);
+        }
 
         // Seeder Monitors (Low-Mid End)
-        Monitor::insert([
+        if (Monitor::count() === 0) {
+            Monitor::insert([
             [
                 'no_inventaris' => 'LABKOM/MN/001/' . $tahunSekarang,
                 'merk' => 'LG',
@@ -518,9 +527,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(9, 17),
             ],
         ]);
+        }
 
         // Seeder Keyboards (Low-Mid End)
-        Keyboard::insert([
+        if (Keyboard::count() === 0) {
+            Keyboard::insert([
             [
                 'no_inventaris' => 'LABKOM/KY/001/' . $tahunSekarang,
                 'merk' => 'Logitech',
@@ -602,9 +613,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(6, 16),
             ],
         ]);
+        }
 
         // Seeder Penyimpanan (Low-Mid End)
-        Penyimpanan::insert([
+        if (Penyimpanan::count() === 0) {
+            Penyimpanan::insert([
             [
                 'no_inventaris' => 'LABKOM/PM/001/SSD',
                 'merk' => 'Kingston',
@@ -706,9 +719,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(6, 14),
             ],
         ]);
+        }
 
         // Seeder Motherboards (Low-Mid End)
-        Motherboard::insert([
+        if (Motherboard::count() === 0) {
+            Motherboard::insert([
             [
                 'no_inventaris' => 'LABKOM/MB/001/' . $tahunSekarang,
                 'merk' => 'ASUS',
@@ -790,9 +805,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(4, 10),
             ],
         ]);
+        }
 
         // Seeder DVD (Low-Mid End)
-        DVD::insert([
+        if (DVD::count() === 0) {
+            DVD::insert([
             [
                 'no_inventaris' => 'LABKOM/DVD/001/' . $tahunSekarang,
                 'dvd' => 'DVD RW',
@@ -884,9 +901,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(2, 7),
             ],
         ]);
+        }
 
         // Seeder Mouse (Low-Mid End)
-        Mouse::insert([
+        if (Mouse::count() === 0) {
+            Mouse::insert([
             [
                 'no_inventaris' => 'LABKOM/MOUSE/001/' . $tahunSekarang,
                 'merk' => 'Logitech',
@@ -968,9 +987,11 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(9, 20),
             ],
         ]);
+        }
 
         // Seeder PSU (Low-Mid End)
-        PSU::insert([
+        if (PSU::count() === 0) {
+            PSU::insert([
             [
                 'no_inventaris' => 'LABKOM/PSU/001/' . $tahunSekarang,
                 'merk' => 'Corsair',
@@ -1072,16 +1093,29 @@ class DatabaseSeeder extends Seeder
                 'stok' => rand(6, 15),
             ],
         ]);
+        }
 
-        User::insert([
+        $adminUser = User::updateOrCreate(
+            ['email' => 'admin@mail.com'],
             [
                 'name' => 'admin',
-                'email' => 'admin@mail.com',
                 'no_phone' => '081234567890',
                 'npp' => 'A11.2022.14079',
                 'position' => 'Super Admin',
                 'password' => bcrypt('admin'),
-            ],
+            ]
+        );
+        $adminUser->assignRole('super_admin');
+
+        // 3. Panggil Master Seeder Tambahan (Harus setelah hardware & user selesai)
+        $this->call([
+            GudangSeeder::class,               // Menambahkan Gudang
+            SoftwareDetailSeeder::class,       // Master data software
+            LabSoftwareSeeder::class,          // Menaruh software di lab
+            CourseSeeder::class,               // Mata kuliah
+            ScheduleSeeder::class,             // Jadwal lab
+            InventarisPcSeeder::class,         // Membuat PC Inventaris + Snapshots pc_components
+            JanuariRekapInventarisSeeder::class// Membuat history rekap inventaris
         ]);
     }
 }

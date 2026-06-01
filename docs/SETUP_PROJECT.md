@@ -135,8 +135,13 @@ php artisan shield:generate --all --panel=admin
 
 ```bash
 php artisan migrate:fresh --seed
-php artisan shield:generate --all --panel=admin
+php artisan shield:generate --all --panel=admin --no-interaction
+php artisan optimize:clear
 ```
+
+> [!IMPORTANT]
+> Setelah melakukan `migrate:fresh`, seluruh data dalam database di-reset. Developer **wajib** menjalankan `shield:generate` dan `optimize:clear`. Langkah ini diperlukan agar seluruh record permission dinamis Filament Shield (seperti `view_any_user`, `create_user`, `update_user`, dan permission resource lainnya) ter-generate kembali di database serta dipetakan secara otomatis ke role `super_admin`. Jika dilewati, halaman master data seperti **Data Laboran** (`/admin/laboran`) akan mengembalikan pesan error **403 Forbidden**.
+
 
 ---
 

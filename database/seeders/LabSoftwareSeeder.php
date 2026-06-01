@@ -103,7 +103,9 @@ class LabSoftwareSeeder extends Seeder
         $skipped = 0;
 
         foreach ($labSoftware as $labRuang => $softwareCodes) {
-            $lab = Laboratorium::where('ruang', $labRuang)->first();
+            $lab = Laboratorium::where('ruang', $labRuang)
+                ->orWhere('ruang', 'LAB ' . $labRuang)
+                ->first();
 
             if (!$lab) {
                 $this->command->warn("Lab not found: {$labRuang}");
@@ -150,7 +152,9 @@ class LabSoftwareSeeder extends Seeder
         $this->command->info("Syncing lab_software pivot table...");
 
         foreach ($labSoftware as $labRuang => $softwareCodes) {
-            $lab = Laboratorium::where('ruang', $labRuang)->first();
+            $lab = Laboratorium::where('ruang', $labRuang)
+                ->orWhere('ruang', 'LAB ' . $labRuang)
+                ->first();
             if (!$lab)
                 continue;
 

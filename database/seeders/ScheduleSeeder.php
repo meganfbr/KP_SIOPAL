@@ -80,7 +80,15 @@ class ScheduleSeeder extends Seeder
         ];
 
         foreach ($schedules as $scheduleData) {
-            Schedule::create($scheduleData);
+            Schedule::updateOrCreate(
+                [
+                    'laboratorium_id' => $scheduleData['laboratorium_id'],
+                    'day' => $scheduleData['day'],
+                    'start_time' => $scheduleData['start_time'],
+                    'end_time' => $scheduleData['end_time'],
+                ],
+                $scheduleData
+            );
         }
 
         $this->command->info('Sample schedules created successfully!');
