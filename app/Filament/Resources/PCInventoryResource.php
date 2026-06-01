@@ -180,12 +180,6 @@ class PCInventoryResource extends Resource
                             ->hiddenOn('create'),
                         DatePicker::make('tanggal_pengadaan')
                             ->disabled(fn () => !auth()->user()->hasRole('super_admin')),
-                        Select::make('petugas_id')
-                            ->label('Petugas')
-                            ->relationship('petugas', 'name')
-                            ->searchable()
-                            ->preload()
-                            ->nullable(),
                         Select::make('kondisi')
                             ->options(['Baik' => 'Baik', 'Rusak Ringan' => 'Rusak Ringan', 'Rusak Berat' => 'Rusak Berat', 'Dalam Perbaikan' => 'Dalam Perbaikan'])
                             ->required()
@@ -365,10 +359,6 @@ class PCInventoryResource extends Resource
                     ->label('Asal PC')
                     ->sortable()
                     ->placeholder('Pengadaan Baru'),
-                TextColumn::make('petugas.name')
-                    ->label('Petugas')
-                    ->sortable()
-                    ->placeholder('-'),
                 TextColumn::make('updated_at')
                     ->label('Last Update')
                     ->dateTime('d F Y H:i')
@@ -378,7 +368,7 @@ class PCInventoryResource extends Resource
                     ->label('Updated By')
                     ->sortable()
                     ->searchable()
-                    ->placeholder('Sistem'),
+                    ->placeholder('Belum Tercatat'),
                 
                 // Existing columns as hidden by default
                 TextColumn::make('kode_inventaris')
@@ -488,9 +478,6 @@ class PCInventoryResource extends Resource
                         TextEntry::make('asal.ruang')
                             ->label('Asal PC')
                             ->placeholder('Pengadaan Baru'),
-                        TextEntry::make('petugas.name')
-                            ->label('Petugas')
-                            ->placeholder('-'),
                         TextEntry::make('kode_inventaris')
                             ->label('No Inventaris'),
                         TextEntry::make('tanggal_pengadaan')
@@ -568,7 +555,7 @@ class PCInventoryResource extends Resource
                             ->dateTime('d M Y, H:i:s'),
                         TextEntry::make('updatedBy.name')
                             ->label('Terakhir Diubah Oleh')
-                            ->placeholder('Sistem')
+                            ->placeholder('Belum Tercatat')
                             ->badge()
                             ->color('info'),
                     ])->columns(2),
