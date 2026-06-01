@@ -84,6 +84,10 @@ class UserResource extends Resource
                     ->label('Tanggal Keluar')
                     ->native(false)
                     ->nullable(),
+                \Filament\Forms\Components\Toggle::make('is_active')
+                    ->label('Status Aktif')
+                    ->default(true)
+                    ->helperText('Nonaktifkan untuk memblokir akses login user ini.'),
             ]);
     }
 
@@ -115,6 +119,14 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('tanggal_masuk')
                     ->label('Tanggal Masuk')
                     ->date()
+                    ->sortable(),
+                Tables\Columns\IconColumn::make('is_active')
+                    ->label('Status')
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-circle')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger')
                     ->sortable(),
                 ImageColumn::make('foto')
                     ->circular(),
@@ -188,15 +200,38 @@ class UserResource extends Resource
                     ->searchable()
                     ->multiple()
                     ->label('Filter by Role'),
+                
+                \Filament\Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Status Aktif')
+                    ->boolean()
+                    ->trueLabel('Aktif')
+                    ->falseLabel('Nonaktif'),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
-                Tables\Actions\ViewAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make()
+                        ->color('gray')
+                        ->icon('heroicon-o-eye'),
+                    Tables\Actions\EditAction::make()
+                        ->color('primary')
+                        ->icon('heroicon-o-pencil'),
+                    Tables\Actions\Action::make('toggleActive')
+                        ->label(fn ($record) => $record->is_active ? 'Nonaktifkan' : 'Aktifkan')
+                        ->icon(fn ($record) => $record->is_active ? 'heroicon-o-x-circle' : 'heroicon-o-check-circle')
+                        ->color(fn ($record) => $record->is_active ? 'danger' : 'success')
+                        ->action(function ($record) {
+                            $record->update(['is_active' => !$record->is_active]);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status berhasil diubah')
+                                ->success()
+                                ->send();
+                        })
+                        ->requiresConfirmation(),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    // Hapus action delete untuk mengamankan data
                 ]),
             ]);
     }

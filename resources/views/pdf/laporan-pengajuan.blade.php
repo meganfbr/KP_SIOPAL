@@ -201,7 +201,7 @@
                 </td>
                 <td class="title-cell">
                     <h2>LABORATORIUM KOMPUTER FIK UDINUS</h2>
-                    <h3>FORM PERMINTAAN TINDAKAN PERBAIKAN DAN PENCEGAHAN<br>(SOFTWARE DAN HARDWARE)</h3>
+                    <h3>FORM PERMINTAAN TINDAKAN PERBAIKAN DAN PENGAJUAN<br>(SOFTWARE DAN HARDWARE)</h3>
                 </td>
                 <td class="meta-cell">
                     <table class="meta-table">
@@ -261,42 +261,38 @@
                 </thead>
                 <tbody>
                     @php
-                        $lines = array_filter(explode("\n", str_replace('\n', "\n", $uraian)));
                         $count = 1;
                     @endphp
-                    @forelse($lines as $line)
-                        @php
-                            $line = trim(str_replace('- PC ', '', $line));
-                            $noPc = '-';
-                            $kodePc = '-';
-                            $komponen = '-';
-                            
-                            if(preg_match('/^(.*?)(?:\s*\(Kode PC:\s*(.*?)\))?:\s*(.*)$/', $line, $matches)) {
-                                $noPc = trim($matches[1]);
-                                $kodePc = !empty($matches[2]) ? trim($matches[2]) : '-';
-                                $komponen = trim($matches[3]);
-                            } else {
-                                $parts = explode(':', $line, 2);
-                                if (count($parts) == 2) {
-                                    $noPc = trim($parts[0]);
-                                    $komponen = trim($parts[1]);
+                    @if(!empty($records) && count($records) > 0)
+                        @foreach($records as $record)
+                            @php
+                                $komponenRusak = [];
+                                if (is_array($record)) {
+                                    $komponenRusak = $record['komponen_rusak'] ?? [];
+                                    $noPc = $record['no_pc'] ?? '-';
+                                    $kodePc = $record['kode_pc'] ?? '-';
                                 } else {
-                                    $komponen = $line;
+                                    $komponenRusak = $record->komponen_rusak ?? [];
+                                    $noPc = $record->no_pc ?? '-';
+                                    $kodePc = $record->kode_pc ?? '-';
                                 }
-                            }
-                        @endphp
-                        <tr>
-                            <td class="center">{{ $count++ }}</td>
-                            <td class="center">{{ $noPc }}</td>
-                            <td class="center">{{ $kodePc }}</td>
-                            <td>{{ $komponen }}</td>
-                            <td>{{ $tindakan_langsung }}</td>
-                        </tr>
-                    @empty
+                                $komponenRusak = is_string($komponenRusak) ? json_decode($komponenRusak, true) : $komponenRusak;
+                            @endphp
+                            @foreach(collect($komponenRusak) as $k)
+                                <tr>
+                                    <td class="center">{{ $count++ }}</td>
+                                    <td class="center">{{ $noPc }}</td>
+                                    <td class="center">{{ $kodePc }}</td>
+                                    <td>{{ is_array($k) ? $k['komponen'] : $k }} ({{ is_array($k) && isset($k['kondisi']) ? $k['kondisi'] : 'Rusak' }})</td>
+                                    <td>{{ (is_array($k) && !empty($k['keterangan'])) ? $k['keterangan'] : '-' }}</td>
+                                </tr>
+                            @endforeach
+                        @endforeach
+                    @else
                         <tr>
                             <td colspan="5" class="center">Tidak ada rincian kerusakan.</td>
                         </tr>
-                    @endforelse
+                    @endif
                 </tbody>
             </table>
         </div>
@@ -348,8 +344,8 @@
                         <div class="ttd-space"></div>
                         <div class="ttd-name">( ..................................................... )</div>
                         <div class="ttd-details">
-                            Bagian&nbsp;&nbsp;&nbsp;&nbsp;: UPT Laboratorium<br>
-                            Jabatan&nbsp;&nbsp;: Super Admin
+                            Bagian&nbsp;&nbsp;&nbsp;&nbsp;: ........................................<br>
+                            Jabatan&nbsp;&nbsp;: ........................................
                         </div>
                     </td>
                 </tr>

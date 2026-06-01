@@ -323,7 +323,11 @@ class RekapInventaris extends Page implements HasForms, HasActions
             }
 
             if (count($broken_components) > 0) {
-                $problematic_pcs[] = "- PC " . $pc->no_pc . ": " . implode(', ', $broken_components);
+                $problematic_pcs[] = [
+                    'no_pc' => $pc->no_pc,
+                    'kode_pc' => $pc->inventory?->kode_pc ?? '-',
+                    'komponen_rusak' => $broken_components,
+                ];
             }
         }
 
@@ -332,8 +336,6 @@ class RekapInventaris extends Page implements HasForms, HasActions
             return;
         }
 
-        $uraian = implode("\n", $problematic_pcs);
-        
         $perbaikan_list = [];
         foreach ($summary_counts as $komp => $qty) {
             $perbaikan_list[] = "- Penggantian $komp ($qty unit)";
@@ -347,7 +349,7 @@ class RekapInventaris extends Page implements HasForms, HasActions
             'ketidaksesuaian' => 'Kerusakan Hardware/Software Inventaris',
             'lab' => $periode->laboratorium?->ruang ?? 'Semua Laboratorium',
             'tanggal' => date('d F Y'),
-            'uraian' => $uraian,
+            'records' => $problematic_pcs,
             'tindakan_langsung' => $catatan ?: 'Melaporkan kerusakan inventaris ke Super Admin.',
             'tindakan_perbaikan' => $tindakan_perbaikan,
             'pelapor' => auth()->user()->name,

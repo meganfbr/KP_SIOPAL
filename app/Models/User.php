@@ -10,8 +10,9 @@ use Spatie\Permission\Traits\HasRoles;
 use App\Traits\HasLabPermissions;
 use Spatie\Activitylog\Traits\LogsActivity;
 use Spatie\Activitylog\LogOptions;
+use Filament\Models\Contracts\FilamentUser;
 
-class User extends Authenticatable
+class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use HasFactory, Notifiable, HasRoles, HasLabPermissions, LogsActivity;
@@ -40,11 +41,19 @@ class User extends Authenticatable
         'foto',
         'tanggal_masuk',
         'tanggal_keluar',
+        'is_active',
     ];
 
-    public function canAccessPanel(): bool
+    public function canAccessPanel(\Filament\Panel $panel): bool
     {
-        // Allow all users to access panel since we removed role-based access
+        if (!$this->is_active) {
+            return false;
+        }
+
+        if ($this->tanggal_keluar && $this->tanggal_keluar->isPast()) {
+            return false;
+        }
+
         return true;
     }
 
@@ -70,6 +79,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'tanggal_masuk' => 'date',
             'tanggal_keluar' => 'date',
+            'is_active' => 'boolean',
         ];
     }
 

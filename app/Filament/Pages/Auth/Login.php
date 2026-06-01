@@ -116,6 +116,12 @@ class Login extends BaseLogin
         ) {
             Filament::auth()->logout();
 
+            if (!$user->is_active || ($user->tanggal_keluar && $user->tanggal_keluar->isPast())) {
+                throw ValidationException::withMessages([
+                    'data.npp' => 'Akun Anda tidak aktif atau masa kontrak telah berakhir.',
+                ]);
+            }
+
             $this->throwFailureValidationException();
         }
 

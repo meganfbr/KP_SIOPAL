@@ -260,13 +260,23 @@
                     </tr>
                 </thead>
                 <tbody>
+                    @php
+                        $count = 1;
+                        $komponenRusak = !empty($komponen_rusak) ? $komponen_rusak : [['komponen' => $komponen, 'kondisi' => $kondisi, 'keterangan' => $keterangan]];
+                    @endphp
+                    @forelse(collect($komponenRusak) as $k)
                     <tr>
-                        <td class="center">1</td>
+                        <td class="center">{{ $count++ }}</td>
                         <td class="center">{{ $no_pc }}</td>
                         <td class="center">{{ $kode_pc ?? '-' }}</td>
-                        <td>{{ $komponen }} ({{ $kondisi }})</td>
-                        <td>{!! nl2br(e($keterangan)) !!}</td>
+                        <td>{{ is_array($k) ? $k['komponen'] : $k }} ({{ is_array($k) && isset($k['kondisi']) ? $k['kondisi'] : 'Rusak' }})</td>
+                        <td>{{ (is_array($k) && !empty($k['keterangan'])) ? $k['keterangan'] : '-' }}</td>
                     </tr>
+                    @empty
+                    <tr>
+                        <td colspan="5" class="center">Tidak ada rincian kerusakan.</td>
+                    </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
@@ -323,8 +333,8 @@
                         <div class="ttd-space"></div>
                         <div class="ttd-name">( ..................................................... )</div>
                         <div class="ttd-details">
-                            Bagian&nbsp;&nbsp;&nbsp;&nbsp;: UPT Laboratorium<br>
-                            Jabatan&nbsp;&nbsp;: Super Admin
+                            Bagian&nbsp;&nbsp;&nbsp;&nbsp;: ........................................<br>
+                            Jabatan&nbsp;&nbsp;: ........................................
                         </div>
                     </td>
                 </tr>

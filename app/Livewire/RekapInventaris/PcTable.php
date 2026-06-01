@@ -541,6 +541,7 @@ class PcTable extends Component implements HasForms, HasTable
                             $problematic_pcs = [];
                             $summary_counts = [];
                             $labName = 'Semua Laboratorium';
+                            $created_laporans = [];
 
                             foreach ($records as $record) {
                                 if ($record->kondisi === 'Baik') {
@@ -575,7 +576,7 @@ class PcTable extends Component implements HasForms, HasTable
                                     }
                                 }
 
-                                \App\Models\LaporanPerbaikan::create([
+                                $laporan = \App\Models\LaporanPerbaikan::create([
                                     'rekap_inventaris_pc_id' => $record->id,
                                     'inventory_id' => $record->inventory_id,
                                     'periode_id' => $record->rekap_inventaris_periode_id,
@@ -590,6 +591,8 @@ class PcTable extends Component implements HasForms, HasTable
                                     'tanggal_pengajuan' => now()->toDateString(),
                                     'user_id' => auth()->id(),
                                 ]);
+                                
+                                $created_laporans[] = $laporan;
                                 
                                 if (count($broken_components_list) > 0) {
                                     $kodeStr = $record->inventory?->kode_pc ? " (Kode PC: " . $record->inventory->kode_pc . ")" : "";
@@ -620,7 +623,7 @@ class PcTable extends Component implements HasForms, HasTable
                                 'ketidaksesuaian' => $data['ketidaksesuaian'],
                                 'lab' => $labName,
                                 'tanggal' => $data['tanggal_kejadian'],
-                                'uraian' => $uraian,
+                                'records' => $created_laporans,
                                 'tindakan_langsung' => $data['tindakan_langsung'],
                                 'tindakan_perbaikan' => $tindakan_perbaikan,
                                 'pelapor' => auth()->user()->name,
